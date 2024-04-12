@@ -2,20 +2,24 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
-    name: {
+    fullName: {
       type: String,
       required: [true, "Name is required"],
+      trim: true,
     },
     username: {
       type: String,
       required: [true, "Username is required"],
       unique: true,
+      trim: true,
+      index: true,
     },
     email: {
       type: String,
       required: [true, "Email is required"],
       unique: true,
       lowercase: true,
+      trim: true,
     },
     password: {
       type: String,
@@ -70,7 +74,5 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 // timestamps will give us createdAt and updatedAt
-
-userSchema.index({ username: 1, email: 1 }, { unique: true });
 
 export const User = mongoose.model("User", userSchema);

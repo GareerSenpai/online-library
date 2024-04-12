@@ -6,6 +6,7 @@ const bookSchema = new mongoose.Schema(
       type: String,
       required: [true, "Username is required"],
       unique: true,
+      index: true,
     },
     author: {
       type: [String],
@@ -57,7 +58,5 @@ const bookSchema = new mongoose.Schema(
   { timestamps: true }
 );
 // reservationList will act like a queue
-
-bookSchema.index({ title: 1, author: 1 }, { unique: true });
 
 export const Book = mongoose.model("Book", bookSchema);
