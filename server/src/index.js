@@ -2,6 +2,8 @@ import "dotenv/config";
 import express from "express";
 import connectDB from "./db/index.js";
 import app from "./app.js";
+import { fetchBookData } from "./API/bookFetchAPI.js";
+import { addBooksToDatabase } from "./utils/databaseCRUD/addBooksToDatabase.js";
 
 connectDB()
   .then(() => {
@@ -15,3 +17,6 @@ connectDB()
     });
   })
   .catch((error) => console.log("MongoDB connection FAILED!!", error));
+
+const books = await fetchBookData();
+addBooksToDatabase(books);

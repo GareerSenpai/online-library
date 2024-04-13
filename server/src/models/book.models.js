@@ -19,12 +19,19 @@ const bookSchema = new mongoose.Schema(
     description: {
       type: String,
     },
+    language: {
+      type: String,
+    },
     genre: {
       type: [String],
       default: [],
     },
     availabilityCount: {
       type: Number,
+    },
+    readOnlineURL: {
+      type: String,
+      default: "",
     },
     borrowedBy: {
       type: [
@@ -33,6 +40,7 @@ const bookSchema = new mongoose.Schema(
           ref: "User",
         },
       ],
+      default: [],
     },
     fine: [
       {
