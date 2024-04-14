@@ -18,5 +18,9 @@ connectDB()
   })
   .catch((error) => console.log("MongoDB connection FAILED!!", error));
 
-const books = await fetchBookData();
-addBooksToDatabase(books);
+fetchBookData()
+  .then((books) => addBooksToDatabase(books))
+  .catch((error) => console.log("Error while fetching books data: ", error));
+
+// const books = await fetchBookData();
+// addBooksToDatabase(books);

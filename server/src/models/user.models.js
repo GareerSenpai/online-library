@@ -74,6 +74,7 @@ const userSchema = new mongoose.Schema(
     },
     refreshToken: {
       type: String,
+      default: "",
     },
   },
   { timestamps: true }
@@ -89,8 +90,8 @@ userSchema.pre("save", async function (next) {
 });
 
 // to be used when user wants to login
-userSchema.methods.isPasswordCorrect = function (password) {
-  return bcrypt.compare(password, this.password);
+userSchema.methods.isPasswordCorrect = async function (password) {
+  return await bcrypt.compare(password, this.password);
 };
 
 userSchema.methods.generateAccessToken = function () {
