@@ -7,7 +7,18 @@ const fetchBookData = async () => {
     const res = await fetch(`${BOOKS_API_BASE_URL}/books`);
     if (!res.ok) throw new Error("Error while fetching books data from API");
     const data = await res.json();
-    return data.results;
+    const books = data.results.map((book) => {
+      return {
+        title: book.title,
+        author: book.authors[0]["name"],
+        coverImageURL: book.formats["image/jpeg"],
+        language: book.languages[0],
+        genre: book.subjects,
+        availabilityCount: Math.floor(Math.random() * 10) + 1,
+        readOnlineURL: book.formats["text/html"],
+      };
+    });
+    return books;
   } catch (error) {
     console.log(
       new ApiError(

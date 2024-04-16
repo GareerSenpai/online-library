@@ -26,6 +26,9 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
       required: [true, "Password is required"],
+      // when we will use save() method it will always check if password is provided
+      // even if just one field is modified. So while saving we can use {validateBeforeSave: false} as an option
+      // in the save method to prevent this.
     },
     isAdmin: {
       type: Boolean,
@@ -74,7 +77,7 @@ const userSchema = new mongoose.Schema(
     },
     refreshToken: {
       type: String,
-      default: "",
+      default: undefined,
     },
   },
   { timestamps: true }

@@ -1,4 +1,4 @@
-import { Book } from "../../models/book.models.js";
+import { Book } from "../../models/book.model.js";
 
 const addBooksToDatabase = async (books) => {
   if (books) {
