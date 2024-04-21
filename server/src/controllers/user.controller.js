@@ -3,6 +3,13 @@ import { User } from "../models/user.model.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
+import { Book } from "../models/book.model.js";
+import {
+  RETURN_DATE_IN_DAYS,
+  BORROW_LIMIT_PER_WEEK,
+  DATE_OPTIONS,
+} from "../constants.js";
+import mongoose from "mongoose";
 
 // this function also saves the new refresh token in user db
 const generateAccessAndRefreshToken = async (user) => {
@@ -234,4 +241,74 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   }
 });
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken };
+const borrowBook = asyncHandler(async (req, res) => {
+  // validate user
+  // validate book
+  // check if book is available
+  // check if user already borrows that book
+  // check if user has reached Book_Limit_Per_Week
+  // update book
+  // update user
+  // send response
+
+  const user = req.user;
+  const { bookId } = req.body;
+  const book = await Book.findById(bookId);
+  if (!book || book.availabilityCount === 0) {
+    throw new ApiError(400, "Book is not available");
+  }
+  if (user.borrowCountThisWeek >= BORROW_LIMIT_PER_WEEK) {
+    throw new ApiError(400, "User cannot borrow more than 3 books per week");
+  }
+
+  const isBookAlreadyBorrowed = user.borrowedBooks.some(
+    (borrowedBook) => borrowedBook.bookId.toString() === bookId
+  );
+  if (isBookAlreadyBorrowed) {
+    throw new ApiError(400, "User has already borrowed that book");
+  }
+
+  // session is being used to maintain atomicity, i.e.,
+  // if any of the operations fail, the whole transaction will be rolled back
+  // it is usually used where multiple operations (may involve multiple collections) are involved
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const date = new Date();
+    date.setDate(date.getDate() + RETURN_DATE_IN_DAYS);
+    user.borrowedBooks.push({
+      bookId,
+      returnDate: date.toLocaleString("en-IN", DATE_OPTIONS),
+    });
+    user.borrowCountThisWeek += 1;
+
+    book.availabilityCount -= 1;
+    book.borrowedBy.push(user._id);
+
+    await user.save({ session, validateBeforeSave: false });
+    await book.save({ session, validateBeforeSave: false });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          book,
+          `Book (id: ${bookId}) borrowed successfully by user (id: ${user._id})`
+        )
+      );
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw new ApiError(
+      500,
+      error?.message || "Internal Server Error",
+      error?.errors
+    );
+  }
+});
+
+export { registerUser, loginUser, logoutUser, refreshAccessToken, borrowBook };

@@ -45,16 +45,15 @@ const userSchema = new mongoose.Schema(
           ref: "Book",
         },
         returnDate: {
-          type: Date,
+          type: String,
           required: [true, "Please enter the return date"],
-        },
-        currentFine: {
-          type: Number,
-          default: 0,
         },
       },
     ],
-
+    borrowCountThisWeek: {
+      type: Number,
+      default: 0,
+    },
     history: [
       {
         bookId: {

@@ -1,9 +1,11 @@
 import "dotenv/config";
 import express from "express";
+import cron from "node-cron";
 import connectDB from "./db/index.js";
 import app from "./app.js";
 import { fetchBookData } from "./API/bookFetchAPI.js";
 import { addBooksToDatabase } from "./utils/databaseCRUD/addBooksToDatabase.js";
+import updateBookBorrowCount from "./scheduled_jobs/updateBookBorrowCount.js";
 
 connectDB()
   .then(() => {
@@ -22,5 +24,4 @@ fetchBookData()
   .then((books) => addBooksToDatabase(books))
   .catch((error) => console.log("Error while fetching books data: ", error));
 
-// const books = await fetchBookData();
-// addBooksToDatabase(books);
+cron.schedule("0 0 * * 1", updateBookBorrowCount); // update borrow count every week on Monday 00:00
