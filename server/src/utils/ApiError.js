@@ -20,4 +20,6 @@ class ApiError extends Error {
   }
 }
 
+// we can throw this as an error and also send as a response
+
 export default ApiError;

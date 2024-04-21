@@ -17,10 +17,12 @@ app.use(express.static("public"));
 
 // import routes
 import userRouter from "./routes/user.route.js";
-import bookRouter from "./routes/book.router.js";
+import bookRouter from "./routes/book.route.js";
+import adminRouter from "./routes/admin.route.js";
 
 //routes declaration
 app.use("/api/v1/users", userRouter);
+app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/books", bookRouter);
 
 export default app;

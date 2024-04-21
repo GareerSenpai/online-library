@@ -34,6 +34,10 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    loggedInAs: {
+      type: String,
+      default: undefined,
+    },
     borrowedBooks: [
       {
         bookId: {
@@ -80,8 +84,9 @@ const userSchema = new mongoose.Schema(
       default: undefined,
     },
   },
-  { timestamps: true }
+  { timestamps: true, strict: false }
 );
+// strict: false helps us to add fields in the doc which are not defined in the schema
 // timestamps will give us createdAt and updatedAt
 
 // so that user saves password in encrypted form whenever only password is modified
@@ -100,10 +105,11 @@ userSchema.methods.isPasswordCorrect = async function (password) {
 userSchema.methods.generateAccessToken = function () {
   return jwt.sign(
     {
-      id: this._id,
+      _id: this._id,
       username: this.username,
       email: this.email,
       fullName: this.fullName,
+      isAdmin: this.isAdmin,
     },
     process.env.ACCESS_TOKEN_SECRET,
     {
@@ -115,7 +121,7 @@ userSchema.methods.generateAccessToken = function () {
 userSchema.methods.generateRefreshToken = function () {
   return jwt.sign(
     {
-      id: this._id,
+      _id: this._id,
     },
     process.env.REFRESH_TOKEN_SECRET,
     {
