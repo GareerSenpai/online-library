@@ -7,8 +7,15 @@ import { Book } from "../models/book.model.js";
 import {
   RETURN_DATE_IN_DAYS,
   BORROW_LIMIT_PER_WEEK,
-  DATE_OPTIONS,
+  DATE_FORMAT,
+  FINE_PER_DAY,
 } from "../constants.js";
+import {
+  format as formatDate,
+  parse as parseDate,
+  differenceInDays,
+  addDays,
+} from "date-fns";
 import mongoose from "mongoose";
 
 // this function also saves the new refresh token in user db
@@ -137,7 +144,7 @@ const loginUser = asyncHandler(async (req, res) => {
     .status(200)
     .cookie("refreshToken", refreshToken, {
       ...cookieOptions,
-      maxAge: user.isAdmin ? undefined : 1000 * 60 * 60 * 24 * 12, // 12 days if user is not admin else cookie acts as session cookie
+      maxAge: user.isAdmin ? undefined : 1000 * 60 * 60 * 24 * 10, // 10 days if user is not admin else cookie acts as session cookie
     })
     .cookie("accessToken", accessToken, {
       ...cookieOptions,
@@ -227,7 +234,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       })
       .cookie("refreshToken", newRefreshToken, {
         ...cookieOptions,
-        maxAge: 1000 * 60 * 60 * 24 * 12, // 12 days
+        maxAge: 1000 * 60 * 60 * 24 * 10, // 10 days
       })
       .json(
         new ApiResponse(
@@ -252,12 +259,15 @@ const borrowBook = asyncHandler(async (req, res) => {
   // send response
 
   const user = req.user;
-  const { bookId } = req.body;
+  const { bookId } = req.body || req.params;
   const book = await Book.findById(bookId);
   if (!book || book.availabilityCount === 0) {
     throw new ApiError(400, "Book is not available");
   }
-  if (user.borrowCountThisWeek >= BORROW_LIMIT_PER_WEEK) {
+  if (
+    user.subscription.toLowerCase() === "free" &&
+    user.borrowCountThisWeek >= BORROW_LIMIT_PER_WEEK
+  ) {
     throw new ApiError(400, "User cannot borrow more than 3 books per week");
   }
 
@@ -274,15 +284,24 @@ const borrowBook = asyncHandler(async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const date = new Date();
-    date.setDate(date.getDate() + RETURN_DATE_IN_DAYS);
+    const issueDate = formatDate(new Date(), DATE_FORMAT);
+    const returnDate = formatDate(
+      addDays(new Date() + RETURN_DATE_IN_DAYS),
+      DATE_FORMAT
+    );
+
     user.borrowedBooks.push({
       bookId,
-      returnDate: date.toLocaleString("en-IN", DATE_OPTIONS),
+      returnDate,
+    });
+    user.history.push({
+      bookId,
+      dateIssued: issueDate,
     });
     user.borrowCountThisWeek += 1;
 
     book.availabilityCount -= 1;
+    // throw new Error("Transaction failed (deliberate error)");
     book.borrowedBy.push(user._id);
 
     await user.save({ session, validateBeforeSave: false });
@@ -311,4 +330,88 @@ const borrowBook = asyncHandler(async (req, res) => {
   }
 });
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken, borrowBook };
+const returnBook = asyncHandler(async (req, res) => {
+  //
+  // check for fine
+  // if no fine, then return book, else pay fine first
+  // update borrowedBy field in book model
+  // update borrowedBooks and history field in user model
+  //send res
+
+  const user = req.user;
+  const { bookId } = req.body || req.params;
+
+  const borrowedBookInDB = await Book.findById(bookId);
+  if (!borrowedBookInDB) {
+    throw new ApiError(404, "Book not found in db");
+  }
+
+  const borrowedBookThatUserHas = user.borrowedBooks.find(
+    (book) => book.bookId.toString() === bookId
+  );
+  if (!borrowedBookThatUserHas) {
+    throw new ApiError(400, "User has not borrowed that book");
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const currentDate = new Date();
+    const returnDate = parseDate(
+      borrowedBookThatUserHas.returnDate,
+      DATE_FORMAT,
+      new Date()
+    );
+    const daysToBeFined = differenceInDays(currentDate, returnDate);
+    const fine = daysToBeFined > 0 ? daysToBeFined * FINE_PER_DAY : 0;
+    if (fine > 0) {
+      // pay fine logic
+      throw new ApiError(402, `User has to pay the fine first: Rs. ${fine}`);
+    }
+
+    user.borrowedBooks = user.borrowedBooks.filter(
+      (book) => book.bookId.toString() !== bookId
+    );
+    user.history.find(
+      (book) => book.bookId.toString() === bookId
+    ).returnStatus = true;
+
+    borrowedBookInDB.borrowedBy = borrowedBookInDB.borrowedBy.filter(
+      (userId) => userId.toString() !== user._id.toString()
+    );
+    borrowedBookInDB.availabilityCount += 1;
+
+    await user.save({ session, validateBeforeSave: false });
+    await borrowedBookInDB.save({ session, validateBeforeSave: false });
+    await session.commitTransaction();
+    session.endSession();
+
+    res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          borrowedBookInDB,
+          `Book (id: ${bookId}) returned successfully by User (id: ${user._id})`
+        )
+      );
+  } catch (error) {
+    session.abortTransaction();
+    session.endSession();
+    throw new ApiError(
+      500,
+      error?.message || "Internal Server Error",
+      error?.errors
+    );
+  }
+});
+
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  refreshAccessToken,
+  borrowBook,
+  returnBook,
+};

@@ -6,6 +6,7 @@ import {
   logoutUser,
   refreshAccessToken,
   borrowBook,
+  returnBook,
 } from "../controllers/user.controller.js";
 
 const router = express.Router();
@@ -17,5 +18,6 @@ router.route("/login").post(loginUser); // this controls the admin login as well
 router.route("/logout").post(verifyJWT, logoutUser);
 router.route("/refresh-token").post(refreshAccessToken);
 router.route("/borrow-book").post(verifyJWT, borrowBook);
+router.route("/return-book").post(verifyJWT, returnBook);
 
 export default router;

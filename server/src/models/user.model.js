@@ -60,6 +60,10 @@ const userSchema = new mongoose.Schema(
           type: mongoose.Schema.Types.ObjectId,
           ref: "Book",
         },
+        dateIssued: {
+          type: String,
+          required: [true, "Please enter the date issued"],
+        },
         returnStatus: {
           type: Boolean,
           default: false,
@@ -74,7 +78,7 @@ const userSchema = new mongoose.Schema(
         },
       },
     ],
-    currentSubscription: {
+    subscription: {
       type: String,
       default: "Free",
     },
