@@ -3,20 +3,8 @@ import { User } from "../models/user.model.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
-import { Book } from "../models/book.model.js";
-import {
-  RETURN_DATE_IN_DAYS,
-  BORROW_LIMIT_PER_WEEK,
-  DATE_FORMAT,
-  FINE_PER_DAY,
-} from "../constants.js";
-import {
-  format as formatDate,
-  parse as parseDate,
-  differenceInDays,
-  addDays,
-} from "date-fns";
-import mongoose from "mongoose";
+import { sendMailVerification } from "../utils/sendMailVerification.js";
+// import { Book } from "../models/book.model.js";
 
 // this function also saves the new refresh token in user db
 const generateAccessAndRefreshToken = async (user) => {
@@ -42,7 +30,9 @@ const registerUser = asyncHandler(async (req, res) => {
 
   const { fullName, username, email, password, confirmPassword } = req.body;
   if (
-    [fullName, username, email, password].some((data) => data.trim() === "")
+    [fullName, username, email, password, confirmPassword].some(
+      (data) => data.trim() === ""
+    )
   ) {
     throw new ApiError(400, "All fields are required");
   } else if (!email.includes("@")) {
@@ -57,21 +47,42 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(409, "User with username or email already exists");
   }
 
-  const user = await User.create({
-    fullName,
-    username,
-    email,
-    password,
-  });
-  // console.log("User created successfully: ", user);
-
-  const registeredUser = await User.findById(user._id).select(
-    "-password -refreshToken"
+  await sendMailVerification(
+    {
+      fullName,
+      username,
+      email,
+      password,
+    }
+    // (redirectURL = "http://localhost:3000/users/register")
   );
 
-  res
-    .status(201) // we are using status here as well because postman looks for the status code exactly here instead of like in ApiResponse we are sending
-    .json(new ApiResponse(201, registeredUser, "User created successfully"));
+  if (!req.registerUser) {
+    res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          {},
+          "Please verify your email before continuing..."
+        )
+      );
+  }
+
+  // const user = await User.create({
+  //   fullName,
+  //   username,
+  //   email,
+  //   password,
+  // });
+
+  // const registeredUser = await User.findById(user._id).select(
+  //   "-password -refreshToken"
+  // );
+
+  // res
+  //   .status(201) // we are using status here as well because postman looks for the status code exactly here instead of like in ApiResponse we are sending
+  //   .json(new ApiResponse(201, registeredUser, "User created successfully"));
 });
 
 const loginUser = asyncHandler(async (req, res) => {
@@ -248,163 +259,91 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   }
 });
 
-const borrowBook = asyncHandler(async (req, res) => {
-  // validate user
-  // validate book
-  // check if book is available
-  // check if user already borrows that book
-  // check if user has reached Book_Limit_Per_Week
-  // update book
-  // update user
-  // send response
-
+const editProfile = asyncHandler(async (req, res) => {
   const user = req.user;
-  const { bookId } = req.body || req.params;
-  const book = await Book.findById(bookId);
-  if (!book || book.availabilityCount === 0) {
-    throw new ApiError(400, "Book is not available");
-  }
-  if (
-    user.subscription.toLowerCase() === "free" &&
-    user.borrowCountThisWeek >= BORROW_LIMIT_PER_WEEK
-  ) {
-    throw new ApiError(400, "User cannot borrow more than 3 books per week");
-  }
-
-  const isBookAlreadyBorrowed = user.borrowedBooks.some(
-    (borrowedBook) => borrowedBook.bookId.toString() === bookId
-  );
-  if (isBookAlreadyBorrowed) {
-    throw new ApiError(400, "User has already borrowed that book");
-  }
-
-  // session is being used to maintain atomicity, i.e.,
-  // if any of the operations fail, the whole transaction will be rolled back
-  // it is usually used where multiple operations (may involve multiple collections) are involved
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  try {
-    const issueDate = formatDate(new Date(), DATE_FORMAT);
-    const returnDate = formatDate(
-      addDays(new Date() + RETURN_DATE_IN_DAYS),
-      DATE_FORMAT
-    );
-
-    user.borrowedBooks.push({
-      bookId,
-      returnDate,
-    });
-    user.history.push({
-      bookId,
-      dateIssued: issueDate,
-    });
-    user.borrowCountThisWeek += 1;
-
-    book.availabilityCount -= 1;
-    // throw new Error("Transaction failed (deliberate error)");
-    book.borrowedBy.push(user._id);
-
-    await user.save({ session, validateBeforeSave: false });
-    await book.save({ session, validateBeforeSave: false });
-
-    await session.commitTransaction();
-    session.endSession();
-
-    res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          book,
-          `Book (id: ${bookId}) borrowed successfully by user (id: ${user._id})`
-        )
-      );
-  } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    throw new ApiError(
-      500,
-      error?.message || "Internal Server Error",
-      error?.errors
-    );
-  }
-});
-
-const returnBook = asyncHandler(async (req, res) => {
-  //
-  // check for fine
-  // if no fine, then return book, else pay fine first
-  // update borrowedBy field in book model
-  // update borrowedBooks and history field in user model
-  //send res
-
-  const user = req.user;
-  const { bookId } = req.body || req.params;
-
-  const borrowedBookInDB = await Book.findById(bookId);
-  if (!borrowedBookInDB) {
-    throw new ApiError(404, "Book not found in db");
-  }
-
-  const borrowedBookThatUserHas = user.borrowedBooks.find(
-    (book) => book.bookId.toString() === bookId
-  );
-  if (!borrowedBookThatUserHas) {
-    throw new ApiError(400, "User has not borrowed that book");
-  }
-
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
-    const currentDate = new Date();
-    const returnDate = parseDate(
-      borrowedBookThatUserHas.returnDate,
-      DATE_FORMAT,
-      new Date()
-    );
-    const daysToBeFined = differenceInDays(currentDate, returnDate);
-    const fine = daysToBeFined > 0 ? daysToBeFined * FINE_PER_DAY : 0;
-    if (fine > 0) {
-      // pay fine logic
-      throw new ApiError(402, `User has to pay the fine first: Rs. ${fine}`);
+  const {
+    newFullName,
+    newEmail,
+    oldPassword,
+    newPassword,
+    confirmNewPassword,
+  } = req.body;
+  if (newFullName) user.fullName = newFullName;
+  if (newEmail) {
+    if (!newEmail.includes("@")) {
+      throw new ApiError(400, "Invalid Email");
     }
 
-    user.borrowedBooks = user.borrowedBooks.filter(
-      (book) => book.bookId.toString() !== bookId
-    );
-    user.history.find(
-      (book) => book.bookId.toString() === bookId
-    ).returnStatus = true;
-
-    borrowedBookInDB.borrowedBy = borrowedBookInDB.borrowedBy.filter(
-      (userId) => userId.toString() !== user._id.toString()
-    );
-    borrowedBookInDB.availabilityCount += 1;
-
-    await user.save({ session, validateBeforeSave: false });
-    await borrowedBookInDB.save({ session, validateBeforeSave: false });
-    await session.commitTransaction();
-    session.endSession();
-
-    res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          borrowedBookInDB,
-          `Book (id: ${bookId}) returned successfully by User (id: ${user._id})`
-        )
-      );
-  } catch (error) {
-    session.abortTransaction();
-    session.endSession();
-    throw new ApiError(
-      500,
-      error?.message || "Internal Server Error",
-      error?.errors
-    );
+    // implement email verification by sending verification link to new email
+    user.email = newEmail;
   }
+  if (oldPassword) {
+    // do password verifications later (regex and stuff)
+    //verify old password
+    const isPasswordValid = await user.isPasswordCorrect(oldPassword);
+    if (!isPasswordValid) {
+      throw new ApiError(400, "Invalid old password");
+    }
+
+    // do password verifications later (regex and stuff)
+    if (newPassword.trim() === "") {
+      throw new ApiError(400, "New Password cannot be empty");
+    }
+    if (newPassword !== confirmNewPassword) {
+      throw new ApiError(400, "New Password and Confirm Password do not match");
+    }
+
+    user.password = newPassword;
+  }
+
+  await user.save({ validateBeforeSave: false });
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, user, "User profile updated successfully"));
+});
+
+const deleteProfile = asyncHandler(async (req, res) => {
+  const user = req.user;
+  const { password } = req.body;
+  if (!password) {
+    throw new ApiError(400, "Password required to delete account!");
+  }
+
+  const isPasswordValid = await user.isPasswordCorrect(password);
+  if (!isPasswordValid) {
+    throw new ApiError(400, "Invalid password");
+  }
+
+  await User.deleteOne({ _id: user._id });
+  res
+    .clearCookie("accessToken")
+    .clearCookie("refreshToken")
+    .status(200)
+    .json(new ApiResponse(200, user, "User account deleted successfully"));
+});
+
+const verifyUserEmailAndRegister = asyncHandler(async (req, res) => {
+  const user = req.registerUser;
+  if (!user) {
+    throw new ApiError(404, "Email verification failed! Try again...");
+  }
+  const { fullName, username, email, password } = user;
+
+  const newUser = await User.create({
+    fullName,
+    username,
+    email,
+    password,
+  });
+
+  const registeredUser = await User.findById(newUser._id).select(
+    "-password -refreshToken"
+  );
+
+  res
+    .status(201) // we are using status here as well because postman looks for the status code exactly here instead of like in ApiResponse we are sending
+    .json(new ApiResponse(201, registeredUser, "User created successfully"));
 });
 
 export {
@@ -412,6 +351,7 @@ export {
   loginUser,
   logoutUser,
   refreshAccessToken,
-  borrowBook,
-  returnBook,
+  editProfile,
+  deleteProfile,
+  verifyUserEmailAndRegister,
 };

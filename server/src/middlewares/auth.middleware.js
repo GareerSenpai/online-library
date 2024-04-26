@@ -33,4 +33,35 @@ const verifyJWT = asyncHandler(async (req, res, next) => {
   }
 });
 
-export { verifyJWT };
+const verifyEmail = asyncHandler(async (req, res, next) => {
+  try {
+    const verificationToken = req.params.verificationToken;
+
+    if (!verificationToken) {
+      throw new ApiError(400, "Invalid verification token");
+    }
+
+    const decodedToken = jwt.verify(
+      verificationToken,
+      process.env.VERIFICATION_TOKEN_SECRET
+    );
+
+    if (!decodedToken) {
+      throw new ApiError(400, "Invalid verification token");
+    }
+
+    const user = {
+      fullName: decodedToken.fullName,
+      email: decodedToken.email,
+      username: decodedToken.username,
+      password: decodedToken.password,
+    };
+
+    req.registerUser = user;
+    next();
+  } catch (error) {
+    throw new ApiError(400, error?.message || "Invalid verification token");
+  }
+});
+
+export { verifyJWT, verifyEmail };
