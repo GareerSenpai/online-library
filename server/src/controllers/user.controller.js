@@ -47,17 +47,19 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(409, "User with username or email already exists");
   }
 
+  const verificationURL =
+    "http://localhost:3000/api/v1/users/register/verify-email";
   await sendMailVerification(
     {
       fullName,
       username,
       email,
       password,
-    }
-    // (redirectURL = "http://localhost:3000/users/register")
+    },
+    verificationURL
   );
 
-  if (!req.registerUser) {
+  if (!req.verifiedUser) {
     res
       .status(200)
       .json(
@@ -85,6 +87,29 @@ const registerUser = asyncHandler(async (req, res) => {
   //   .json(new ApiResponse(201, registeredUser, "User created successfully"));
 });
 
+const verifyUserEmailAndRegister = asyncHandler(async (req, res) => {
+  const user = req.verifiedUser;
+  if (!user) {
+    throw new ApiError(404, "Email verification failed! Try again...");
+  }
+  const { fullName, username, email, password } = user;
+
+  const newUser = await User.create({
+    fullName,
+    username,
+    email,
+    password,
+  });
+
+  const registeredUser = await User.findById(newUser._id).select(
+    "-password -refreshToken"
+  );
+
+  res
+    .status(201) // we are using status here as well because postman looks for the status code exactly here instead of like in ApiResponse we are sending
+    .json(new ApiResponse(201, registeredUser, "User created successfully"));
+});
+
 const loginUser = asyncHandler(async (req, res) => {
   // get user data from frontend
   // validate user
@@ -101,7 +126,6 @@ const loginUser = asyncHandler(async (req, res) => {
   }
 
   const { usernameOrEmail, password, loginAs } = req.body;
-  // console.log(username);
 
   if (!usernameOrEmail) {
     throw new ApiError(400, "Username or email is required");
@@ -323,27 +347,76 @@ const deleteProfile = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, user, "User account deleted successfully"));
 });
 
-const verifyUserEmailAndRegister = asyncHandler(async (req, res) => {
-  const user = req.registerUser;
-  if (!user) {
-    throw new ApiError(404, "Email verification failed! Try again...");
+const enterRecoveryEmail = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    throw new ApiError(400, "Email required");
   }
-  const { fullName, username, email, password } = user;
+  if (!email.includes("@")) {
+    throw new ApiError(400, "Invalid Email");
+  }
 
-  const newUser = await User.create({
-    fullName,
-    username,
-    email,
-    password,
-  });
+  const user = await User.findOne({ email }).select("-password -refreshToken");
+  if (!user) {
+    throw new ApiError(404, "User with given email not found");
+  }
 
-  const registeredUser = await User.findById(newUser._id).select(
-    "-password -refreshToken"
+  // TODO: implement email verification for password reset
+  // for reset password --> change the url to something that the front-end would use...
+  // the front-end can then make a post request to backend reset-password api route
+  // handle the jwt carefully here as it may be vulnerable if provided in the url
+  const verificationURL = "http://localhost:3000/api/v1/users/reset-password";
+  await sendMailVerification(
+    {
+      username: user.username,
+      email: user.email,
+    },
+    verificationURL
   );
 
   res
-    .status(201) // we are using status here as well because postman looks for the status code exactly here instead of like in ApiResponse we are sending
-    .json(new ApiResponse(201, registeredUser, "User created successfully"));
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        user,
+        "Email sent successfully. Please verify email."
+      )
+    );
+});
+
+const resetPassword = asyncHandler(async (req, res) => {
+  const user = req.verifiedUser;
+  if (!user) {
+    throw new ApiError(404, "Email verification failed! Try again...");
+  }
+
+  const { password, confirmPassword } = req.body;
+  if (!password) {
+    throw new ApiError(400, "Password required");
+  } // add more regex validations
+  if (password !== confirmPassword) {
+    throw new ApiError(400, "Password and confirm password do not match");
+  }
+
+  const updatedUser = await User.findOne({
+    username: user.username,
+  });
+
+  if (!updatedUser) {
+    throw new ApiError(404, "User not found");
+  }
+
+  updatedUser.password = password;
+
+  await updatedUser.save({ validateBeforeSave: false });
+
+  updatedUser.password = undefined;
+  updatedUser.refreshToken = undefined;
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, updatedUser, "Password updated successfully"));
 });
 
 export {
@@ -354,4 +427,6 @@ export {
   editProfile,
   deleteProfile,
   verifyUserEmailAndRegister,
+  enterRecoveryEmail,
+  resetPassword,
 };

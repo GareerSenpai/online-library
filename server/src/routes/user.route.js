@@ -8,6 +8,8 @@ import {
   editProfile,
   deleteProfile,
   verifyUserEmailAndRegister,
+  enterRecoveryEmail,
+  resetPassword,
 } from "../controllers/user.controller.js";
 
 const router = express.Router();
@@ -19,6 +21,10 @@ router
 
 // secure routes
 router.route("/login").post(loginUser); // this controls the admin login as well
+router.route("/forgot-password").post(enterRecoveryEmail);
+router
+  .route("/reset-password/:verificationToken")
+  .post(verifyEmail, resetPassword);
 router.route("/logout").post(verifyJWT, logoutUser);
 router.route("/refresh-token").post(refreshAccessToken);
 router.route("/edit-profile").post(verifyJWT, editProfile);

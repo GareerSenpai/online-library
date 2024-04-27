@@ -57,7 +57,7 @@ const verifyEmail = asyncHandler(async (req, res, next) => {
       password: decodedToken.password,
     };
 
-    req.registerUser = user;
+    req.verifiedUser = user;
     next();
   } catch (error) {
     throw new ApiError(400, error?.message || "Invalid verification token");
