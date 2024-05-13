@@ -3,6 +3,7 @@ import axios from "axios";
 import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { DevTool } from "@hookform/devtools";
+import { BiSolidHide, BiSolidShow } from "react-icons/bi";
 
 function AuthForm({ fields, type }) {
   const {
@@ -11,6 +12,9 @@ function AuthForm({ fields, type }) {
     control,
     formState: { errors: formErrors },
   } = useForm();
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const apiSuccessMessage = useRef("");
   const apiErrorMessage = useRef("");
@@ -62,7 +66,9 @@ function AuthForm({ fields, type }) {
           <div className="field" key={field.name}>
             <input
               type={
-                field.name.toLowerCase().includes("password")
+                (field.name.toLowerCase() === "password" && !showPassword) ||
+                (field.name.toLowerCase() === "confirmpassword" &&
+                  !showConfirmPassword)
                   ? "password"
                   : "text"
               }
@@ -108,7 +114,22 @@ function AuthForm({ fields, type }) {
                   },
                 }),
               })}
-            />
+            />{" "}
+            <div
+              className="password-icon"
+              onClick={() => {
+                if (field.name.toLowerCase() === "password") {
+                  setShowPassword(!showPassword);
+                } else if (field.name.toLowerCase() === "confirmpassword") {
+                  setShowConfirmPassword(!showConfirmPassword);
+                }
+              }}
+            >
+              {field.name.toLowerCase() === "password" &&
+                (showPassword ? <BiSolidHide /> : <BiSolidShow />)}
+              {field.name.toLowerCase() === "confirmpassword" &&
+                (showConfirmPassword ? <BiSolidHide /> : <BiSolidShow />)}
+            </div>
             <p className="field-error">{formErrors[field.name]?.message}</p>
           </div>
         ))}
