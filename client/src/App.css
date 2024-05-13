@@ -99,9 +99,10 @@ button {
   width: 73%;
   position: relative;
   top: 50%;
-  translate: 0 -60%;
+  translate: 0 -55%;
   padding: 16px;
   margin-left: calc(25%);
+  max-height: 84%;
 }
 
 .auth-title {
@@ -172,4 +173,8 @@ button {
   position: absolute;
   top: 12px;
   right: 12px;
+}
+
+.password-icon:hover {
+  cursor: pointer;
 }
