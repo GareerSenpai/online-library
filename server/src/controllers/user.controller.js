@@ -44,7 +44,12 @@ const registerUser = asyncHandler(async (req, res) => {
   });
 
   if (existingUser) {
-    throw new ApiError(409, "User with username or email already exists");
+    throw new ApiError(
+      409,
+      existingUser.username === username
+        ? "Username already taken"
+        : "Email already taken"
+    );
   }
 
   const verificationURL =
