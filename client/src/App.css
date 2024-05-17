@@ -207,7 +207,7 @@ button {
 .filter-box.open {
   border: 1px solid;
   padding: 1rem;
-  max-height: 400px;
+  max-height: 600px;
 }
 
 .filter-field {
@@ -251,10 +251,27 @@ button {
   cursor: pointer;
 }
 
+.filter-type > .input-box {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  flex-wrap: wrap;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+.filter-type > .input-box input {
+  border: none;
+  /* width: auto; */
+  padding: 2px 8px;
+  min-width: 200px;
+  flex: 1;
+}
+
 .filter-button {
-  /* position: absolute;
-  top: 12px;
-  right: 60px; */
   user-select: none;
   min-width: fit-content;
 }
@@ -295,4 +312,43 @@ button {
 
 .search-field input {
   border-color: transparent;
+}
+
+.filter-suggestion-box {
+  position: fixed;
+  z-index: 1000;
+  width: 20vw;
+  background-color: #eee;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 4px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+
+.filter-suggestion-box li {
+  padding: 8px;
+  list-style: none;
+  border-bottom: 1px solid black;
+  user-select: none;
+}
+
+.filter-suggestion-box li:hover {
+  background-color: #ddd;
+}
+
+.filter-suggestion-box li:last-child {
+  border-bottom: none;
+}
+
+.tag {
+  border-radius: 8px;
+  background-color: #333;
+  color: #fff;
+  padding: 8px;
+  user-select: none;
+}
+
+.tag:hover {
+  cursor: pointer;
 }
