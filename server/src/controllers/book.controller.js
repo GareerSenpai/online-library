@@ -17,30 +17,6 @@ import {
 } from "date-fns";
 import mongoose from "mongoose";
 
-const fetchBooks = asyncHandler(async (req, res) => {
-  try {
-    const { page, limit } = req.query;
-
-    const startIndex = (parseInt(page) - 1) * 10;
-    const maxLimit = parseInt(limit) || 10;
-
-    if (isNaN(startIndex) || isNaN(maxLimit)) {
-      throw new ApiError(400, "Invalid page or limit");
-    }
-
-    const bookList = await Book.find().skip(startIndex).limit(maxLimit);
-    res
-      .status(200)
-      .json(new ApiResponse(200, bookList, "Books fetched successfully"));
-  } catch (error) {
-    throw new ApiError(
-      error.statusCode || 500,
-      error.message || "Error while fetching books",
-      error.errors
-    );
-  }
-});
-
 const borrowBook = asyncHandler(async (req, res) => {
   // validate user
   // validate book
@@ -201,4 +177,115 @@ const returnBook = asyncHandler(async (req, res) => {
   }
 });
 
-export { fetchBooks, borrowBook, returnBook };
+const fetchBooks = asyncHandler(async (req, res) => {
+  try {
+    const { page, limit } = req.query;
+
+    const startIndex = (parseInt(page) - 1) * 10;
+    const maxLimit = parseInt(limit) || 10;
+
+    if (isNaN(startIndex) || isNaN(maxLimit)) {
+      throw new ApiError(400, "Invalid page or limit");
+    }
+
+    const bookList = await Book.find().skip(startIndex).limit(maxLimit);
+    res
+      .status(200)
+      .json(new ApiResponse(200, bookList, "Books fetched successfully"));
+  } catch (error) {
+    throw new ApiError(
+      error.statusCode || 500,
+      error.message || "Error while fetching books",
+      error.errors
+    );
+  }
+});
+
+const fetchTitle = asyncHandler(async (req, res) => {
+  const { title } = req.body;
+});
+
+const fetchGenres = asyncHandler(async (req, res) => {
+  const uniqueGenresPipeline = await Book.aggregate([
+    { $unwind: "$genre" },
+    {
+      $group: {
+        _id: "$genre",
+        count: { $sum: 1 },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        genre: "$_id",
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        genres: { $push: "$genre" },
+      },
+    },
+  ]);
+
+  const genreQuery = req.query.genre;
+  let genresToSend = "";
+  if (genreQuery) {
+    genresToSend = uniqueGenresPipeline[0].genres.filter((genre) =>
+      genre.toLowerCase().includes(genreQuery.toLowerCase())
+    );
+  }
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { type: "genre", genres: genresToSend },
+        "Genres fetched"
+      )
+    );
+});
+
+const fetchAuthors = asyncHandler(async (req, res) => {
+  const uniqueAuthorsPipeline = await Book.aggregate([
+    { $unwind: "$author" },
+    {
+      $group: {
+        _id: "$author",
+        count: { $sum: 1 },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        author: "$_id",
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        authors: { $push: "$author" },
+      },
+    },
+  ]);
+
+  const authorQuery = req.query.author;
+  let authorsToSend = "";
+  if (authorQuery) {
+    authorsToSend = uniqueAuthorsPipeline[0].authors.filter((author) =>
+      author.toLowerCase().includes(authorQuery.toLowerCase())
+    );
+  }
+
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { type: "author", authors: authorsToSend },
+        "Authors fetched"
+      )
+    );
+});
+
+export { fetchBooks, fetchGenres, fetchAuthors, borrowBook, returnBook };
