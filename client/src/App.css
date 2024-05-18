@@ -334,6 +334,10 @@ button {
 }
 
 .filter-suggestion-box li:hover {
+  background-color: #ccc;
+}
+
+.filter-suggestion-box li.active {
   background-color: #ddd;
 }
 

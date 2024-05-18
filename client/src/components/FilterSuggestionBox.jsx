@@ -6,6 +6,8 @@ function FilterSuggestionBox({
   setSelectedSuggestions,
   setSearchQuery,
   elementRef,
+  activeSuggestionIndex,
+  inputRef,
 }) {
   if (suggestions.length === 0) return null;
 
@@ -13,16 +15,21 @@ function FilterSuggestionBox({
   const { left, bottom } = position;
 
   const handleSuggestionClick = (e) => {
-    console.log(e.target.innerText);
     setSelectedSuggestions((prev) => [...prev, e.target.innerText]);
     setSuggestions([]);
     setSearchQuery("");
+    inputRef.current.focus();
   };
 
   return (
     <ul style={{ left: left, top: bottom }} className="filter-suggestion-box">
-      {suggestions?.map((suggestion) => (
-        <li onClick={handleSuggestionClick} key={suggestion}>
+      {suggestions?.map((suggestion, index) => (
+        <li
+          id={`suggestion-${index}`}
+          className={index === activeSuggestionIndex ? "active" : ""}
+          onClick={handleSuggestionClick}
+          key={suggestion}
+        >
           {suggestion}
         </li>
       ))}

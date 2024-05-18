@@ -17,9 +17,15 @@ function SearchBox() {
   const [selectedAuthors, setSelectedAuthors] = useState([]);
   const [genreSearchQuery, setGenreSearchQuery] = useState("");
   const [authorSearchQuery, setAuthorSearchQuery] = useState("");
+  const [activeGenreSuggestionIndex, setActiveGenreSuggestionIndex] =
+    useState(0);
+  const [activeAuthorSuggestionIndex, setActiveAuthorSuggestionIndex] =
+    useState(0);
 
   const genreSearchBox = useRef(null);
   const authorSearchBox = useRef(null);
+  const genreInputRef = useRef(null);
+  const authorInputRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = () => {
@@ -46,9 +52,15 @@ function SearchBox() {
     const res = await axios.get(url, { params: { [type]: query } });
 
     if (type === "genre") {
-      setGenreSuggestions(res?.data.data.genres);
+      const filteredGenres = res?.data.data.genres.filter(
+        (genre) => !selectedGenres.includes(genre)
+      );
+      setGenreSuggestions(filteredGenres);
     } else if (type === "author") {
-      setAuthorSuggestions(res?.data.data.authors);
+      const filteredAuthors = res?.data.data.authors.filter(
+        (author) => !selectedAuthors.includes(author)
+      );
+      setAuthorSuggestions(filteredAuthors);
     }
   };
 
@@ -67,6 +79,37 @@ function SearchBox() {
 
     fetchFilterSuggestions(query, type);
   }, 300);
+
+  const handleGenreKeyDown = (e) => {
+    if (e.key === "Enter" && genreSearchQuery) {
+      const newSelectedGenre = genreSuggestions[activeGenreSuggestionIndex];
+      setSelectedGenres((prev) => [...prev, newSelectedGenre]);
+      setActiveGenreSuggestionIndex(0);
+      setGenreSuggestions([]);
+      setGenreSearchQuery("");
+    }
+    if (e.key === "Backspace" && !genreSearchQuery) {
+      setSelectedGenres((prev) => prev.slice(0, -1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveGenreSuggestionIndex((prev) => {
+        const newIndex = prev > 0 ? prev - 1 : prev;
+        document
+          .getElementById(`suggestion-${newIndex}`)
+          .scrollIntoView({ block: "nearest" });
+        return newIndex;
+      });
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveGenreSuggestionIndex((prev) => {
+        const newIndex = prev < genreSuggestions.length - 1 ? prev + 1 : prev;
+        document
+          .getElementById(`suggestion-${newIndex}`)
+          .scrollIntoView({ block: "nearest" });
+        return newIndex;
+      });
+    }
+  };
 
   return (
     <div className="search-box">
@@ -88,16 +131,19 @@ function SearchBox() {
                   key={genre}
                   tagName={genre}
                   removeSelected={(data) =>
-                    setSelectedGenres((prev) =>
-                      prev.filter((genre) => genre !== data)
-                    )
+                    setSelectedGenres((prev) => {
+                      genreInputRef.current.focus();
+                      return prev.filter((genre) => genre !== data);
+                    })
                   }
                 />
               ))}
               <input
+                ref={genreInputRef}
                 name="genre"
                 type="text"
                 value={genreSearchQuery}
+                onKeyDown={handleGenreKeyDown}
                 onChange={(e) => {
                   setGenreSearchQuery(e.target.value);
                   handleFilterChange(e);
@@ -106,13 +152,13 @@ function SearchBox() {
               />
             </div>
             <FilterSuggestionBox
-              suggestions={genreSuggestions.filter(
-                (suggestion) => !selectedGenres.includes(suggestion)
-              )}
+              suggestions={genreSuggestions}
               setSuggestions={setGenreSuggestions}
               setSelectedSuggestions={setSelectedGenres}
               setSearchQuery={setGenreSearchQuery}
+              activeSuggestionIndex={activeGenreSuggestionIndex}
               elementRef={genreSearchBox}
+              inputRef={genreInputRef}
             />
           </div>
           <p>
@@ -141,13 +187,15 @@ function SearchBox() {
                   key={author}
                   tagName={author}
                   removeSelected={(data) =>
-                    setSelectedAuthors((prev) =>
-                      prev.filter((author) => author !== data)
-                    )
+                    setSelectedAuthors((prev) => {
+                      authorInputRef.current.focus();
+                      return prev.filter((author) => author !== data);
+                    })
                   }
                 />
               ))}
               <input
+                ref={authorInputRef}
                 name="author"
                 type="text"
                 value={authorSearchQuery}
@@ -159,13 +207,12 @@ function SearchBox() {
               />
             </div>
             <FilterSuggestionBox
-              suggestions={authorSuggestions.filter(
-                (suggestion) => !selectedAuthors.includes(suggestion)
-              )}
+              suggestions={authorSuggestions}
               setSuggestions={setAuthorSuggestions}
               setSelectedSuggestions={setSelectedAuthors}
               setSearchQuery={setAuthorSearchQuery}
               elementRef={authorSearchBox}
+              inputRef={authorInputRef}
             />
           </div>
           <p>
