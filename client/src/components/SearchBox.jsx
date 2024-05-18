@@ -22,8 +22,8 @@ function SearchBox() {
   const [activeAuthorSuggestionIndex, setActiveAuthorSuggestionIndex] =
     useState(0);
 
-  const genreSearchBox = useRef(null);
-  const authorSearchBox = useRef(null);
+  const genreSearchBoxRef = useRef(null);
+  const authorSearchBoxRef = useRef(null);
   const genreInputRef = useRef(null);
   const authorInputRef = useRef(null);
 
@@ -52,14 +52,20 @@ function SearchBox() {
     const res = await axios.get(url, { params: { [type]: query } });
 
     if (type === "genre") {
-      const filteredGenres = res?.data.data.genres.filter(
+      let filteredGenres = res?.data.data.genres.filter(
         (genre) => !selectedGenres.includes(genre)
       );
+      if (filteredGenres.length === 0) {
+        filteredGenres = ["Nothing found"];
+      }
       setGenreSuggestions(filteredGenres);
     } else if (type === "author") {
-      const filteredAuthors = res?.data.data.authors.filter(
+      let filteredAuthors = res?.data.data.authors.filter(
         (author) => !selectedAuthors.includes(author)
       );
+      if (filteredAuthors.length === 0) {
+        filteredAuthors = ["Nothing found", ...filteredAuthors];
+      }
       setAuthorSuggestions(filteredAuthors);
     }
   };
@@ -80,34 +86,48 @@ function SearchBox() {
     fetchFilterSuggestions(query, type);
   }, 300);
 
-  const handleGenreKeyDown = (e) => {
-    if (e.key === "Enter" && genreSearchQuery) {
-      const newSelectedGenre = genreSuggestions[activeGenreSuggestionIndex];
-      setSelectedGenres((prev) => [...prev, newSelectedGenre]);
-      setActiveGenreSuggestionIndex(0);
-      setGenreSuggestions([]);
-      setGenreSearchQuery("");
+  const handleKeyboardNavigation = (
+    e,
+    {
+      type,
+      activeSuggestionIndex,
+      setActiveSuggestionIndex,
+      suggestions,
+      setSuggestions,
+      setSelectedSuggestions,
+      searchQuery,
+      setSearchQuery,
     }
-    if (e.key === "Backspace" && !genreSearchQuery) {
-      setSelectedGenres((prev) => prev.slice(0, -1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActiveGenreSuggestionIndex((prev) => {
-        const newIndex = prev > 0 ? prev - 1 : prev;
-        document
-          .getElementById(`suggestion-${newIndex}`)
-          .scrollIntoView({ block: "nearest" });
-        return newIndex;
-      });
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActiveGenreSuggestionIndex((prev) => {
-        const newIndex = prev < genreSuggestions.length - 1 ? prev + 1 : prev;
-        document
-          .getElementById(`suggestion-${newIndex}`)
-          .scrollIntoView({ block: "nearest" });
-        return newIndex;
-      });
+  ) => {
+    if (suggestions.length > 0) {
+      if (e.key === "Enter") {
+        const newSelectedSuggestion = suggestions[activeSuggestionIndex];
+        if (newSelectedSuggestion.toLowerCase() === "nothing found") return;
+        setSelectedSuggestions((prev) => [...prev, newSelectedSuggestion]);
+        setActiveSuggestionIndex(0);
+        setSuggestions([]);
+        setSearchQuery("");
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveSuggestionIndex((prev) => {
+          const newIndex = prev > 0 ? prev - 1 : prev;
+          document
+            .getElementById(`${type}-suggestion-${newIndex}`)
+            .scrollIntoView({ block: "nearest" });
+          return newIndex;
+        });
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveSuggestionIndex((prev) => {
+          const newIndex = prev < suggestions.length - 1 ? prev + 1 : prev;
+          document
+            .getElementById(`${type}-suggestion-${newIndex}`)
+            .scrollIntoView({ block: "nearest" });
+          return newIndex;
+        });
+      }
+    } else if (e.key === "Backspace" && !searchQuery) {
+      setSelectedSuggestions((prev) => prev.slice(0, -1));
     }
   };
 
@@ -125,7 +145,7 @@ function SearchBox() {
         <div className="filter-field">
           <div className="filter-type">
             <label htmlFor="genre">Genre : </label>
-            <div className="input-box" ref={genreSearchBox}>
+            <div className="input-box" ref={genreSearchBoxRef}>
               {selectedGenres.map((genre) => (
                 <Tag
                   key={genre}
@@ -143,7 +163,18 @@ function SearchBox() {
                 name="genre"
                 type="text"
                 value={genreSearchQuery}
-                onKeyDown={handleGenreKeyDown}
+                onKeyDown={(e) =>
+                  handleKeyboardNavigation(e, {
+                    type: "genre",
+                    activeSuggestionIndex: activeGenreSuggestionIndex,
+                    setActiveSuggestionIndex: setActiveGenreSuggestionIndex,
+                    suggestions: genreSuggestions,
+                    setSuggestions: setGenreSuggestions,
+                    setSelectedSuggestions: setSelectedGenres,
+                    searchQuery: genreSearchQuery,
+                    setSearchQuery: setGenreSearchQuery,
+                  })
+                }
                 onChange={(e) => {
                   setGenreSearchQuery(e.target.value);
                   handleFilterChange(e);
@@ -151,15 +182,18 @@ function SearchBox() {
                 autoComplete="off"
               />
             </div>
-            <FilterSuggestionBox
-              suggestions={genreSuggestions}
-              setSuggestions={setGenreSuggestions}
-              setSelectedSuggestions={setSelectedGenres}
-              setSearchQuery={setGenreSearchQuery}
-              activeSuggestionIndex={activeGenreSuggestionIndex}
-              elementRef={genreSearchBox}
-              inputRef={genreInputRef}
-            />
+            {genreSuggestions.length > 0 && (
+              <FilterSuggestionBox
+                suggestions={genreSuggestions}
+                setSuggestions={setGenreSuggestions}
+                setSelectedSuggestions={setSelectedGenres}
+                setSearchQuery={setGenreSearchQuery}
+                activeSuggestionIndex={activeGenreSuggestionIndex}
+                elementRef={genreSearchBoxRef}
+                inputRef={genreInputRef}
+                type="genre"
+              />
+            )}
           </div>
           <p>
             Include{" "}
@@ -181,7 +215,7 @@ function SearchBox() {
         <div className="filter-field">
           <div className="filter-type">
             <label htmlFor="author">Author : </label>
-            <div className="input-box" ref={authorSearchBox}>
+            <div className="input-box" ref={authorSearchBoxRef}>
               {selectedAuthors.map((author) => (
                 <Tag
                   key={author}
@@ -199,6 +233,18 @@ function SearchBox() {
                 name="author"
                 type="text"
                 value={authorSearchQuery}
+                onKeyDown={(e) =>
+                  handleKeyboardNavigation(e, {
+                    type: "author",
+                    activeSuggestionIndex: activeAuthorSuggestionIndex,
+                    setActiveSuggestionIndex: setActiveAuthorSuggestionIndex,
+                    suggestions: authorSuggestions,
+                    setSuggestions: setAuthorSuggestions,
+                    setSelectedSuggestions: setSelectedAuthors,
+                    searchQuery: authorSearchQuery,
+                    setSearchQuery: setAuthorSearchQuery,
+                  })
+                }
                 onChange={(e) => {
                   setAuthorSearchQuery(e.target.value);
                   handleFilterChange(e);
@@ -206,14 +252,18 @@ function SearchBox() {
                 autoComplete="off"
               />
             </div>
-            <FilterSuggestionBox
-              suggestions={authorSuggestions}
-              setSuggestions={setAuthorSuggestions}
-              setSelectedSuggestions={setSelectedAuthors}
-              setSearchQuery={setAuthorSearchQuery}
-              elementRef={authorSearchBox}
-              inputRef={authorInputRef}
-            />
+            {authorSuggestions.length > 0 && (
+              <FilterSuggestionBox
+                suggestions={authorSuggestions}
+                setSuggestions={setAuthorSuggestions}
+                setSelectedSuggestions={setSelectedAuthors}
+                setSearchQuery={setAuthorSearchQuery}
+                activeSuggestionIndex={activeAuthorSuggestionIndex}
+                elementRef={authorSearchBoxRef}
+                inputRef={authorInputRef}
+                type="author"
+              />
+            )}
           </div>
           <p>
             Include{" "}
